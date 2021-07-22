@@ -159,6 +159,8 @@ create or replace table tips(
     "text" text
 );
 
+
+
 --insert the data from the stage JSON
 insert into tips 
 select 
@@ -170,6 +172,10 @@ tipsjson:"text"::text
 from yelp.stage.tips; 
 
 select * from tips;
+
+-- add the PK to the review table MAKE REVIEW ID THE PK!!
+ALTER TABLE tips ADD PRIMARY KEY ("business_id");
+
 
 
 
@@ -260,7 +266,8 @@ from stage.temperature;
 
 select * from temperature limit 10;
 
-
+-- add the PK to the temperature table 
+ALTER TABLE temperature ADD PRIMARY KEY ("date");
 
 
 --****** Precipitation Table to ODS
@@ -286,4 +293,8 @@ UPDATE precipitation
 SET "precipititation" = "precipitation_normal"
 where "precipititation" = 'T';
 
---change precipitation to decimal
+-- add primary key to precipitation table
+ALTER TABLE precipitation ADD PRIMARY KEY ("date");
+
+
+--change precipitation to decimal when creating in DW
