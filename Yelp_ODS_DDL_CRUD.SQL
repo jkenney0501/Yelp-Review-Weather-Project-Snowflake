@@ -343,11 +343,14 @@ ALTER TABLE business ADD FOREIGN KEY (location_id) REFERENCES bus_location(locat
 alter table business
 add column location_id INT;
 
--- NEEDS CORRECTED, NOT WORKING!
-INSERT INTO business(location_id)
-select location_id 
+-- update business table with FK values from bus_location
+update business
+set business.location_id = bus_location.location_id
 from bus_location
-where bus_location.state = business.state;
+where business.state = bus_location.state;
+
+-- Massach example
+select * from business where location_id = 11;
 
 --delete from  business
 --where location_id is not null;
