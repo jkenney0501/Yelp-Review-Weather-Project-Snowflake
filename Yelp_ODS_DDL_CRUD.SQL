@@ -9,7 +9,17 @@ but cardinality will be specififed in accordance with the ODS ERD. Later when
 we move to the data warehouse, the STAR schema will come into pay with 
 DIM and a FACT table for the yelp reviews and weather anlaysis.
 
-Last Update: 7/18/2021
+Note: SOME 3nf principles are applied here but not entirely.
+What is applied is for some adherence to 3nf and primarily practice
+but given this data set will not be updated and is a one time analysis,
+many tables are not broken down to 3nf for this reaon alone. Also, UPDATE
+ON DELETE/CASCADING is not applied to foreign keys due to this reason as well.
+
+Snowflake trial is limited to 30 days anf the objective the analysis in additon
+to a little practice for JSON/staging and creating a data warehouse 
+for analysis inaddition to some manual ELT/ETL.
+
+Last Update: 8/8/2021
 **********************************************************************************/
 
 --to create tables and perform ETL from JSON staging files
@@ -310,8 +320,18 @@ ALTER TABLE precipitation ADD PRIMARY KEY (date_precip);
 
 
 
---*********** Normalize tables in ODS **************
--- creating state, city and address tables to normalize
+/**********************************************************
+Normalize (only a few) tables in ODS Schema
+
+Tables are broken down to save disk space and make it easy
+to create a FACT/DIM STAR schema in the data warehouse.
+
+Tables are created in sequence due to the order for which
+constraints are added.
+
+***********************************************************/
+-- CREATE STATE (LOCATION) TABLE
+-- creating state (location), city and address tables to normalize
 create or replace table location (
     state VARCHAR(5)
 );
@@ -332,16 +352,20 @@ create or replace sequence busseq1 start = 1 increment = 1;
 INSERT INTO bus_location
 SELECT state, busseq1.NEXTVAL FROM location;
 
-SELECT * FROM BUS_LOCATION;
+-- CHECK RESULTS
+SELECT * 
+FROM BUS_LOCATION
+LIMIT 100;
 
--- now drop the orignal table
+-- now drop the orignal location table
 drop table location;
 
 -- ***** go back to business table and alter it to drop the state name, add loc_id
-ALTER TABLE business ADD FOREIGN KEY (location_id) REFERENCES bus_location(location_id);
-
+-- drop the actual columns last!
 alter table business
 add column location_id INT;
+
+ALTER TABLE business ADD FOREIGN KEY (location_id) REFERENCES bus_location(location_id);
 
 -- update business table with FK values from bus_location
 update business
@@ -349,8 +373,103 @@ set business.location_id = bus_location.location_id
 from bus_location
 where business.state = bus_location.state;
 
--- Massach example
-select * from business where location_id = 11;
+-- MA example
+select * 
+from business 
+where location_id = 11;
 
 --delete from  business
 --where location_id is not null;
+
+
+/* CREATE CITY TABLE */
+--****** Create city table with cols city_id, address_id, city *****
+create or replace table city1(
+    city VARCHAR(200),
+)
+
+insert into city1
+select distinct city from business;
+
+Select * from city1 limit 100;
+
+-- replicate the table and create a sequence to add the auto inc PK
+CREATE or replace TABLE city LIKE city1;
+
+ALTER TABLE city ADD COLUMN city_id int primary key IDENTITY(1,1);
+
+create or replace sequence cityseq start = 1 increment = 1;
+
+INSERT INTO city
+SELECT city, cityseq.NEXTVAL FROM city1;
+
+-- CHECK RESULTS
+SELECT * 
+FROM city
+LIMIT 100;
+
+-- add the fk to the business table
+-- ***** go back to business table and alter it to drop the city, add city_id
+-- drop the actual columns last!
+alter table business
+add column city_id INT;
+
+ALTER TABLE business ADD FOREIGN KEY (city_id) REFERENCES city(city_id);
+
+-- update business table with FK values from bus_location
+update business
+set business.city_id = city.city_id
+from city
+where business.city = city.city;
+
+-- check values to validate the match
+select city, city_id
+from business 
+--where city_id = 1;
+where city in ('Austn', 'Salem', 'Vancouver', 'Winter Springs');
+
+/******************************************************************
+Create zip code table
+*******************************************************************/
+create or replace table zip_code1(
+    postal_code VARCHAR(100)
+);
+
+INSERT INTO zip_code1
+select distinct
+postal_code
+from business;
+
+-- replicate the table and create a sequence to add the auto inc PK
+CREATE or replace TABLE zip_code LIKE zip_code1;
+
+ALTER TABLE zip_code ADD COLUMN zip_id int primary key IDENTITY(1,1);
+
+create or replace sequence zipseq start = 1 increment = 1;
+
+INSERT INTO zip_code
+SELECT postal_code, zipseq.NEXTVAL FROM zip_code1;
+
+-- CHECK RESULTS
+SELECT * 
+FROM zip_code
+LIMIT 100;
+
+-- now update bus table with FK col and values
+-- ***** go back to business table and alter it to drop the postal_code, add zip_id
+-- drop the actual columns last!
+alter table business
+add column zip_id INT;
+
+ALTER TABLE business ADD FOREIGN KEY (zip_id) REFERENCES zip_code(zip_id);
+
+-- update business table with FK values from bus_location
+update business
+set business.zip_id = zip_code.zip_id
+from zip_code
+where business.postal_code = zip_code.postal_code;
+
+--check zips data
+select * from business where state = 'MA' AND CITY = 'Boston'; 
+
+
